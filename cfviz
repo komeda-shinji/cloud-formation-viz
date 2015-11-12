@@ -38,9 +38,15 @@ def extract_graph(name, elem):
     graph = {'name': name, 'nodes': [], 'edges': [], 'subgraphs': []}
     edges = []
     for item, details in elem.iteritems():
-        graph['nodes'].append({'name': item})
+        d = {'name': item}
+        for k in details.keys():
+            if k.endswith('Policy') or k in ['Properties', 'Value']:
+                d[k] = details[k]
+        graph['nodes'].append(d)
         edges.extend(flatten(find_refs(item, details)))
     return (graph, edges)
+
+from_to = {}
 
 def find_refs(context, elem):
     if isinstance(elem, dict):
@@ -48,10 +54,18 @@ def find_refs(context, elem):
         for k, v in elem.iteritems():
             if unicode(k) == unicode('Ref'):
                 assert isinstance(v, basestring), 'Expected a string: %s' % v
-                refs.append({'from': v, 'to': context})
+                if not from_to.has_key(v):
+                    from_to[v] = []
+                if not context in from_to[v]:
+                    from_to[v].append(context)
+                    refs.append({'from': v, 'to': context})
             elif unicode(k) == unicode('Fn::GetAtt'):
                 assert isinstance(v, list), 'Expected a list: %s' % v
-                refs.append({'from': v[0], 'to': context})
+                if not from_to.has_key(v[0]):
+                    from_to[v[0]] = []
+                if not context in from_to[v[0]]:
+                    refs.append({'from': v[0], 'to': context})
+                    from_to[v[0]].append(context)
             else:
                 refs.extend(find_refs(context, v))
         return refs
@@ -68,14 +82,22 @@ def find_refs(context, elem):
 
 def render(graph, subgraph=False):
     print '%s "%s" {' % ('subgraph' if subgraph else 'digraph', graph['name'])
-    print 'labeljust=l;'
-    print 'node [shape={}];'.format(graph.get('shape', 'box'))
+    print 'node [shape={}, fontsize=12];'.format(graph.get('shape', 'box'))
     if 'style' in graph:
         print 'node [style="%s"]' % graph['style']
     if 'rank' in graph:
         print 'rank=%s' % graph['rank']
     for n in graph['nodes']:
-        print '"%s"' % n['name']
+        tooltip = ""
+        for k in n.keys():
+            if k == 'name':
+                continue
+            p = json.dumps(n[k], indent=4, separators=(',', ': ')).replace('\\', '\\\\').replace('"', '\\"').replace('\n', '&#10;\n')
+            tooltip += '%s: %s&#10;\n' % (k, p)
+        if tooltip:
+            print '"%s" [tooltip="%s"]' % (n['name'], tooltip)
+        else:
+            print '"%s"' % n['name']
     for s in graph['subgraphs']:
         render(s, True)
     for e in graph['edges']:
