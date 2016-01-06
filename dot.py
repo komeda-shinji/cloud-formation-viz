@@ -1,4 +1,4 @@
-# coding: latin-1
+# coding: utf-8
 # Copyright (c) 2009,2010,2011,2012,2013,2014 Dirk Baechle.
 # www: https://bitbucket.org/dirkbaechle/dottoxml
 # mail: dl9obn AT darc.de
@@ -25,9 +25,18 @@ import X11Colors
 r_label = re.compile(r'label\s*=\s*"\s*\{[^\}]*\}\s*"\s*')
 r_labelstart = re.compile(r'label\s*=\s*"\s*\{')
 r_labelclose = re.compile(r'\}\s*"')
+r_quoted = re.compile(r'^"(.*)"$') 
 
 # Default output encoding for the ASCII output formats GML and GDF
-latinenc = "latin-1"
+utf8enc = "utf-8"
+Data_id = [
+    { u'for': u'node', u'yfiles.type': u'nodegraphics' },
+    { u'for': u'node', u'attr.name': u'description', u'attr.type': u'string' },
+    { u'for': u'edge', u'yfiles.type': u'edgegraphics' },
+    { u'for': u'edge', u'attr.name': u'description', u'attr.type': u'string' },
+    { u'for': u'graphml', u'yfiles.type': u'resources' } ]
+for i, d in enumerate(Data_id):
+    d[u'id'] = u'd%d' % i
 
 def compileAttributes(attribs):
     """ return the list of attributes as a DOT text string """
@@ -205,14 +214,148 @@ def findLastUnquoted(string, char, spos=0, qchar='"'):
             
     return lastpos
 
+class ClassProperty(property):
+    pass
+
+class PropertyMeta(type):
+
+    def __new__(cls, name, bases, namespace):
+        props = [(k, v) for k, v in namespace.items() if type(v) == ClassProperty]
+        for k, v in props:
+            setattr(cls, k, v)
+            del namespace[k]
+        return type.__new__(cls, name, bases, namespace)
+
+class GraphML:
+
+    __metaclass__ = PropertyMeta
+    data_id = {}
+
+    for key_data in Data_id:
+        if key_data['for'] == 'graphml':
+            if key_data.has_key('attr.name'):
+                data_id[key_data['attr.name']] = key_data['id']
+            elif key_data.has_key('yfiles.type'):
+                data_id[key_data['yfiles.type']] = key_data['id']
+
+class Graph:
+    __metaclass__ = PropertyMeta
+
+    """ a single node in the graph """
+
+    __gid = 0
+    data_id = {}
+
+    for key_data in Data_id:
+        if key_data['for'] == 'graph':
+            if key_data.has_key('attr.name'):
+                data_id[key_data['attr.name']] = key_data['id']
+            elif key_data.has_key('yfiles.type'):
+                data_id[key_data['yfiles.type']] = key_data['id']
+
+    @ClassProperty
+    def Nodes(cls):
+        return cls.__Graphs
+
+    @ClassProperty
+    def gid(cls):
+        return cls.__gid
+
+    @gid.setter
+    def gid(cls, val):
+        cls.__gid = val
+
+    @classmethod
+    def find(cls, label):
+        if cls.__Graphs.has_key(label):
+            return cls.Graphs[label]
+        else:
+            None
+
+    def __init__(self, label=None):
+        self.__label = ""
+        self.id = 'g%d' % self.__class__.gid
+        self.__class__.gid += 1
+        self.attribs = {}
+        if label:
+            self.label = label
+
+    @property
+    def label(self):
+        return self.__label
+
+    @label.setter
+    def label(self, label):
+        self.__label = label
+        self.attribs['label'] = label
+        return
+
+    def exportGraphml(self, doc, parent, conf):        
+        """ export the graph in Graphml format and append it to the parent XML graph """
+
+        graph = doc.createElement(u'graph')
+        graph.setAttribute(u'edgedefault',u'directed')    
+        graph.setAttribute(u'id',u'%s' % self.id)
+        graph.setAttribute(u'parse.order', u'free')    
+        parent.appendChild(graph)
+        return graph
+
 class Node:
     """ a single node in the graph """
-    def __init__(self):
-        self.label = ""
-        self.id = 0
+
+    __metaclass__ = PropertyMeta
+
+    __Nodes = {}
+    __nid = 0
+    data_id = {}
+
+    for key_data in Data_id:
+        if key_data['for'] == 'node':
+            if key_data.has_key('attr.name'):
+                data_id[key_data['attr.name']] = key_data['id']
+            elif key_data.has_key('yfiles.type'):
+                data_id[key_data['yfiles.type']] = key_data['id']
+
+    @ClassProperty
+    def Nodes(cls):
+        return cls.__Nodes
+
+    @ClassProperty
+    def nid(cls):
+        return cls.__nid
+
+    @nid.setter
+    def nid(cls, val):
+        cls.__nid = val
+
+    @classmethod
+    def find(cls, label):
+        if cls.__Nodes.has_key(label):
+            return cls.__Nodes[label]
+        else:
+            None
+
+    def __init__(self, label=None):
+        self.__label = ""
+        self.id = 'n%d' % self.__class__.nid
+        self.__class__.nid += 1
         self.attribs = {}
         self.referenced = False
         self.sections = []
+        if label:
+            self.label = label
+
+    @property
+    def label(self):
+        return self.__label
+
+    @label.setter
+    def label(self, label):
+        self.__label = label
+        if label:
+            self.attribs['label'] = label
+            self.__class__.__Nodes[label] = self
+        return
 
     def initFromString(self, line):
         """ extract node info from the given text line """
@@ -243,7 +386,10 @@ class Node:
         self.label = line.strip('"')
         # Process attributes
         if len(atts):
-            self.attribs = parseAttributes(atts)
+            spos = atts.rfind(']')
+            if spos > 0:
+                atts = atts[:spos]
+                self.attribs = parseAttributes(atts)
         # Process sections
         if self.attribs.has_key("label"):
             tlabel = self.attribs["label"]
@@ -311,31 +457,48 @@ class Node:
 
     def exportGDF(self, o, conf):
         """ write the node in GDF format to the given file """
-        tlabel = self.getLabel(conf).encode(latinenc, errors="ignore")
+        tlabel = self.getLabel(conf).encode(utf8enc, errors="ignore")
         if tlabel == "":
-            tlabel = "n%d" % self.id
+            tlabel = "%s" % self.id
         o.write("%s\n" % tlabel)
 
     def exportGML(self, o, conf):
         """ write the node in GML format to the given file """
         o.write("  node [\n")
-        o.write("    id %d\n" % self.id)
+        o.write("    id %s\n" % self.id)
         o.write("    label\n")
-        o.write("    \"%s\"\n" % self.getLabel(conf).encode(latinenc, errors="ignore"))
+        o.write("    \"%s\"\n" % self.getLabel(conf).encode(utf8enc, errors="ignore"))
         o.write("  ]\n")
 
     def exportGraphml(self, doc, parent, conf):        
         """ export the node in Graphml format and append it to the parent XML node """
         node = doc.createElement(u'node')
-        node.setAttribute(u'id',u'n%d' % self.id)
+        node.setAttribute(u'id',u'%s' % self.id)
         
         data0 = doc.createElement(u'data')
-        data0.setAttribute(u'key', u'd0')
+        data0.setAttribute(u'key', self.__class__.data_id['nodegraphics'])
 
         exportUml = False
         if len(self.sections) > 0 and conf.NodeUml and not conf.LumpAttributes:
             exportUml = True
             snode = doc.createElement(u'y:UMLClassNode')
+        elif self.attribs.has_key('ImageNode'):
+            snode = doc.createElement(u'y:ImageNode')
+            simg = doc.createElement(u'y:Image')
+            simg.setAttribute(u'alphaImage',u'true')
+            simg.setAttribute(u'refid',self.attribs['ImageNode'])
+            snode.appendChild(simg)
+        elif self.attribs.has_key('SVGNode'):
+            snode = doc.createElement(u'y:SVGNode')
+            ssvg = doc.createElement(u'y:SVGModel')
+            ssvg.setAttribute(u'svgBoundsPolicy',u'0')
+            ssvgp = doc.createElement(u'y:SVGNodeProperties')
+            ssvgp.setAttribute(u'usingVisualBounds',u'true')
+            snode.appendChild(ssvgp)
+            ssvgc = doc.createElement(u'y:SVGContent')
+            ssvgc.setAttribute(u'refid',self.attribs['SVGNode'])
+            ssvg.appendChild(ssvgc)
+            snode.appendChild(ssvg)
         else:
             snode = doc.createElement(u'y:ShapeNode')
         geom = doc.createElement(u'y:Geometry')
@@ -369,8 +532,8 @@ class Node:
         label.setAttribute(u'fontStyle',u'plain')
         label.setAttribute(u'hasBackgroundColor',u'false')
         label.setAttribute(u'hasLineColor',u'false')
-        label.setAttribute(u'modelName',u'internal')
-        label.setAttribute(u'modelPosition',u'c')
+        label.setAttribute(u'modelName', self.attribs.get(u'modelName', u'internal'))
+        label.setAttribute(u'modelPosition', self.attribs.get(u'modelPosition', u'c'))
         label.setAttribute(u'textColor',u'%s' % color)
         label.setAttribute(u'visible',u'true')
         nodeLabelText = escapeNewlines(self.getLabel(conf, True))
@@ -399,23 +562,139 @@ class Node:
             shape.appendChild(mlabel)
         else:
             shape = doc.createElement(u'y:Shape')
-            shape.setAttribute(u'type',u'rectangle')
+            shape.setAttribute(u'type', self.attribs.get(u'shapeType', u'rectangle'))
         snode.appendChild(shape)
         data0.appendChild(snode)
         node.appendChild(data0)
 
         data1 = doc.createElement(u'data')
-        data1.setAttribute(u'key', u'd1')
+        data1.setAttribute(u'key', Node.data_id['description'])
+        if self.attribs.has_key('description'):
+            data1.appendChild(doc.createTextNode(u'%s' % self.attribs['description']))
+        data1.setAttribute(u'key', Node.data_id['description'])
+        if self.attribs.has_key('description'):
+            data1.appendChild(doc.createTextNode(u'%s' % self.attribs['description']))
         node.appendChild(data1)
         
+        for k in Node.data_id.keys():
+            if self.attribs.has_key(k):
+                data1 = doc.createElement(u'data')
+                data1.setAttribute(u'key', Node.data_id[k])
+                data1.appendChild(doc.createTextNode(u'%s' % self.attribs[k]))
+                node.appendChild(data1)
+
         parent.appendChild(node)
+
+class Folder(Node):
+
+    def __init__(self, label=None):
+        super(Folder, self).__init__(label)
+        self.id = 'n%d' % Node.nid
+        Node.nid += 1
+        self.__class__.nid = Node.nid
+        self.is_folder = True
+        if label:
+            self.label = label
+
+    def exportGraphml(self, doc, parent, conf):        
+        """ export the folder node in Graphml format and append it to the parent XML node """
+        node = doc.createElement(u'node')
+        node.setAttribute(u'id',u'%s' % self.id)
+        node.setAttribute(u'yfiles.foldertype', u'group')
+
+        data0 = doc.createElement(u'data')
+        data0.setAttribute(u'key', self.__class__.data_id['nodegraphics'])
+
+        proxy = doc.createElement(u'y:ProxyAutoBoundsNode')
+        realizers = doc.createElement(u'y:Realizers')
+        realizers.setAttribute(u'active', u'0')
+
+        groupnode = doc.createElement(u'y:GroupNode')
+
+        color = "#F5F5F5"
+        fill = doc.createElement(u'y:Fill')
+        fill.setAttribute(u'color',u'%s' % color)
+        fill.setAttribute(u'transparent',u'true')
+        groupnode.appendChild(fill)
+
+        border = doc.createElement(u'y:BorderStyle')
+        border.setAttribute(u'color',u'#000000')
+        border.setAttribute(u'type',u'dashed')
+        border.setAttribute(u'width',u'1.0')
+        groupnode.appendChild(border)
+
+        label = doc.createElement(u'y:NodeLabel')
+        label.setAttribute(u'alignment',u'right')
+        label.setAttribute(u'autoSizePolicy',u'node_width')
+        label.setAttribute(u'fontFamily',u'Dialog')
+        label.setAttribute(u'fontSize',u'12')
+        label.setAttribute(u'fontStyle',u'plain')
+        label.setAttribute(u'hasBackgroundColor',u'false')
+        label.setAttribute(u'hasLineColor',u'false')
+        label.setAttribute(u'modelName', u'internal')
+        label.setAttribute(u'modelPosition', u't')
+        label.setAttribute(u'textColor',u'%s' % "#000000")
+        label.setAttribute(u'visible',u'true')
+        nodeLabelText = escapeNewlines(self.getLabel(conf, True))
+        label.appendChild(doc.createTextNode(u'%s' % nodeLabelText))        
+        groupnode.appendChild(label)
+
+        realizers.appendChild(groupnode)
+
+        proxy.appendChild(realizers)
+        data0.appendChild(proxy)
+        node.appendChild(data0)
+
+        return node
 
 class Edge:
     """ a single edge in the graph """
-    def __init__(self):
-        self.id = 0
-        self.src = ""
-        self.dest = ""
+
+    __metaclass__ = PropertyMeta
+
+    __Edges = {}
+    __eid = 0
+    data_id = {}
+
+    for key_data in Data_id:
+        if key_data['for'] == 'edge':
+            if key_data.has_key('attr.name'):
+                data_id[key_data['attr.name']] = key_data['id']
+            elif key_data.has_key('yfiles.type'):
+                data_id[key_data['yfiles.type']] = key_data['id']
+
+    @ClassProperty
+    def Edges(cls):
+        return cls.__Edges
+
+    @ClassProperty
+    def eid(cls):
+        return cls.__eid
+
+    @eid.setter
+    def eid(cls, val):
+        cls.__eid = val
+
+    @classmethod
+    def find(cls, label):
+        if cls.__Edges.has_key(label):
+            return cls.__Edges[label]
+        else:
+            None
+
+    def __init__(self, src=None, dest=None):
+        self.id = 'e%d' % self.__class__.eid
+        self.__class__.eid += 1
+        if src:
+            self.src = src
+            src.referenced = True
+        else:
+            self.src = None
+        if dest:
+            self.dest = dest
+            dest.referenced = True
+        else:
+            self.dest = None
         self.attribs = {}
 
     def initFromString(self, line):
@@ -444,13 +723,20 @@ class Edge:
         line = line.rstrip(';')
         line = line.rstrip()
         # Process labels
-        ll = line.replace('->',' ').split()
-        if len(ll) > 1:
-            self.src = ll[0].strip('"')
-            self.dest = ll[1].strip('"')
+        ll = line.split()
+        if len(ll) == 3:
+            m = r_quoted.match(ll[0])
+            if m:
+                self.src = Node.find(m.group(1))
+            m = r_quoted.match(ll[2].rstrip(';'))
+            if m:
+                self.dest = Node.find(m.group(1))
         # Process attributes
         if len(atts):
-            self.attribs = parseAttributes(atts)
+            spos = atts.rfind(']')
+            if spos > 0:
+                atts = atts[:spos]
+                self.attribs = parseAttributes(atts)
                         
     def getLabel(self, nodes, conf):
         """ return the label of the edge """
@@ -480,38 +766,38 @@ class Edge:
     def exportDot(self, o, nodes, conf):
         """ write the edge in DOT format to the given file """
         if len(self.attribs) > 0:
-            o.write("\"%s\" -> \"%s\" %s;\n" % (self.src, self.dest, compileAttributes(self.attribs)))
+            o.write("\"%s\" -> \"%s\" %s;\n" % (self.src.label, self.dest.label, compileAttributes(self.attribs)))
         else:
-            o.write("\"%s\" -> \"%s\";\n" % (self.src, self.dest))
+            o.write("\"%s\" -> \"%s\";\n" % (self.src.label, self.dest.label))
 
     def exportGDF(self, o, nodes, conf):
         """ write the edge in GDF format to the given file """
-        slabel = nodes[self.src].getLabel(conf)
+        slabel = self.src.getLabel(conf)
         if slabel == "":
-            slabel = "n%d" % nodes[self.src].id
+            slabel = "%s" % self.src.id
         dlabel = nodes[self.dest].getLabel(conf)
         if dlabel == "":
-            dlabel = "n%d" % nodes[self.dest].id
-        o.write("%s,%s\n" % (slabel.encode(latinenc, errors="ignore"), dlabel.encode(latinenc, errors="ignore")))
+            dlabel = "%s" % self.dest.id
+        o.write("%s,%s\n" % (slabel.encode(utf8enc, errors="ignore"), dlabel.encode(utf8enc, errors="ignore")))
 
     def exportGML(self, o, nodes, conf):
         """ write the edge in GML format to the given file """
         o.write("  edge [\n")
-        o.write("    source %d\n" % nodes[self.src].id)
-        o.write("    target %d\n" % nodes[self.dest].id)
+        o.write("    source %d\n" % self.src.id)
+        o.write("    target %d\n" % self.dest.id)
         o.write("    label\n")
-        o.write("    \"%s\"\n" % self.getLabel(nodes, conf).encode(latinenc, errors="ignore"))
+        o.write("    \"%s\"\n" % self.getLabel(nodes, conf).encode(utf8enc, errors="ignore"))
         o.write("  ]\n")
 
     def exportGraphml(self, doc, parent, nodes, conf):
         """ export the edge in Graphml format and append it to the parent XML node """
         edge = doc.createElement(u'edge')
-        edge.setAttribute(u'id',u'e%d' % self.id)
-        edge.setAttribute(u'source',u'n%d' % nodes[self.src].id)
-        edge.setAttribute(u'target',u'n%d' % nodes[self.dest].id)
+        edge.setAttribute(u'id',u'%s' % self.id)
+        edge.setAttribute(u'source',u'%s' % self.src.id)
+        edge.setAttribute(u'target',u'%s' % self.dest.id)
         
         data2 = doc.createElement(u'data')
-        data2.setAttribute(u'key', u'd2')
+        data2.setAttribute(u'key', self.__class__.data_id[u'edgegraphics'])
 
         pedge = doc.createElement(u'y:PolyLineEdge')
         line = doc.createElement(u'y:LineStyle')
@@ -558,7 +844,33 @@ class Edge:
         edge.appendChild(data2)
 
         data3 = doc.createElement(u'data')
-        data3.setAttribute(u'key', u'd3')
+        data3.setAttribute(u'key', Edge.data_id['description'])
         edge.appendChild(data3)
         
         parent.appendChild(edge)
+
+def add_keydata(key_data):
+    id = 'd%d' % (len(Data_id) + 1)
+
+    key = None
+    if key_data.has_key('attr.name'):
+        key = key_data['attr.name']
+    elif key_data.has_key('yfiles.type'):
+        key = key_data['yfiles.type']
+
+    if key_data['for'] == 'node':
+        if not Node.data_id.has_key(key):
+            Node.data_id[key] = id
+            key_data['id'] = id
+            Data_id.append(key_data)
+    elif key_data['for'] == 'node':
+        if not Edge.data_id.has_key(key):
+            Edge.data_id[key] = id
+            key_data['id'] = id
+            Data_id.append(key_data)
+    elif key_data['for'] == 'graphml':
+        if not GraphML.data.has_key(key):
+            GraphML.data_id[key] = id
+            key_data['id'] = id
+            Data_id.append(key_data)
+
