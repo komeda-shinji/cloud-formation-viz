@@ -17,10 +17,10 @@ SVGNode = {}
 
 #class Graph:
 #    def __init__(self):
-#	self.nodes = {}
-#	self.edges = []
-#	self.default_edge = None
-#	self.default_node = None
+#       self.nodes = {}
+#       self.edges = []
+#       self.default_edge = None
+#       self.default_node = None
 
 #G = Graph()
 #AG = nx.to_agraph(nx.Graph())
@@ -128,10 +128,10 @@ def main():
     render(doc, graphml, root, graph, options)
 
     for keydata in dot.Data_id:
-	key = doc.createElement(u'key')
+        key = doc.createElement(u'key')
         for k, v in keydata.iteritems():
-	    key.setAttribute(k, v)
-	graphml.appendChild(key)
+            key.setAttribute(k, v)
+        graphml.appendChild(key)
 
     data = doc.createElement(u'data')
     data.setAttribute(u'key', dot.GraphML.data_id[u'resources'])
@@ -230,21 +230,21 @@ def layout(doc, graph, options):
         from networkx.readwrite.graphml import GraphMLReader
 
         reader = GraphMLReader()
-	glist=list(reader(string=doc.toxml(encoding="utf-8")))
-	
-	G = nx.Graph()
-	for subg in glist:
-	    for n in subg.nodes():
-		if subg.node[n].has_key('label'):
-		    subg.node[n]['label'] = '"%s"' % subg.node[n]['label']
-		for k in subg.node[n].keys():
-		    if not k in ['y', 'x', 'label']:
-			del(subg.node[n][k])
-	    G.add_nodes_from(subg.nodes(data=True))
-	    G.add_edges_from(subg.edges(data=True))
+        glist=list(reader(string=doc.toxml(encoding="utf-8")))
+        
+        G = nx.Graph()
+        for subg in glist:
+            for n in subg.nodes():
+                if subg.node[n].has_key('label'):
+                    subg.node[n]['label'] = '"%s"' % subg.node[n]['label']
+                for k in subg.node[n].keys():
+                    if not k in ['y', 'x', 'label']:
+                        del(subg.node[n][k])
+            G.add_nodes_from(subg.nodes(data=True))
+            G.add_edges_from(subg.edges(data=True))
 
-	# set graph_defaults
-	G.graph['graph'] = { 'nodesep': '1.5', 'ranksep': '1.5' }
+        # set graph_defaults
+        G.graph['graph'] = { 'nodesep': '1.5', 'ranksep': '1.5' }
 
         return G
 
@@ -253,41 +253,41 @@ def layout(doc, graph, options):
 
         P = pydot.graph_from_dot_data('\n'.join(graph['dot']))
         g_with_pos = pydot.graph_from_dot_data(P.create_dot())
-	pos = {}
-	for n in g_with_pos.get_nodes():
-	    p = n.get_pos()
-	    if p:
-		x, y = p.strip('"').split(",")
-		x, y = float(x), float(y)
-		pos[n.get_name()] = (x, y)
-	for s in g_with_pos.get_subgraph_list():
-	    for n in s.get_nodes():
-		p = n.get_pos()
-		if p:
-		    x, y = p.strip('"').split(",")
-		    x, y = float(x), float(y)
-		    pos[n.get_name()] = (x, y)
+        pos = {}
+        for n in g_with_pos.get_nodes():
+            p = n.get_pos()
+            if p:
+                x, y = p.strip('"').split(",")
+                x, y = float(x), float(y)
+                pos[n.get_name()] = (x, y)
+        for s in g_with_pos.get_subgraph_list():
+            for n in s.get_nodes():
+                p = n.get_pos()
+                if p:
+                    x, y = p.strip('"').split(",")
+                    x, y = float(x), float(y)
+                    pos[n.get_name()] = (x, y)
         return pos
 
     def from_pygraphviz(graph):
         import pygraphviz
 
-	A = pygraphviz.AGraph(string='\n'.join(graph['dot']))
-	G = nx.from_agraph(A)
+        A = pygraphviz.AGraph(string='\n'.join(graph['dot']))
+        G = nx.from_agraph(A)
 
-	A.layout(prog=options.LayoutStyle)
-	pos = {}
-	for n in G:
-	    node = pygraphviz.Node(A, n)
-	    try:
-		xx,yy = node.attr["pos"].split(',')
-		pos[n] = (float(xx), float(yy))
-	    except:
-		pass
+        A.layout(prog=options.LayoutStyle)
+        pos = {}
+        for n in G:
+            node = pygraphviz.Node(A, n)
+            try:
+                xx,yy = node.attr["pos"].split(',')
+                pos[n] = (float(xx), float(yy))
+            except:
+                pass
         return pos
 
     if options.LayoutStyle in ['dot', 'neato', 'fdp', 'sfdp', 'twopi', 'circo']:
-	graph['dot'].insert(1, 'graph [nodesep=1.5, ranksep=2.0];')
+        graph['dot'].insert(1, 'graph [nodesep=1.5, ranksep=2.0];')
         try:
             pos = from_pydot(graph)
         except:
@@ -298,39 +298,39 @@ def layout(doc, graph, options):
                 pos = nx.graphviz_layout(G, prog=options.LayoutStyle)
     else:
         G = create_from_graphml(doc)
-	if options.LayoutStyle == 'spring':
-	    pos = nx.spring_layout(G, scale=500.0)
-	elif options.LayoutStyle == 'circular':
-	    pos = nx.circular_layout(G, scale=500.0)
-	elif options.LayoutStyle == 'random':
-	    pos = nx.random_layout(g)
-	    for id, xy in pos.iteritems():
-		pos[id][0] *= 500.0
-		pos[id][1] *= 500.0
-	elif options.LayoutStyle == 'shell':
-	    pos = nx.shell_layout(G, scale=500.0)
-	elif options.LayoutStyle == 'spectral':
-	    pos = nx.spectral_layout(G, scale=500.0)
+        if options.LayoutStyle == 'spring':
+            pos = nx.spring_layout(G, scale=500.0)
+        elif options.LayoutStyle == 'circular':
+            pos = nx.circular_layout(G, scale=500.0)
+        elif options.LayoutStyle == 'random':
+            pos = nx.random_layout(g)
+            for id, xy in pos.iteritems():
+                pos[id][0] *= 500.0
+                pos[id][1] *= 500.0
+        elif options.LayoutStyle == 'shell':
+            pos = nx.shell_layout(G, scale=500.0)
+        elif options.LayoutStyle == 'spectral':
+            pos = nx.spectral_layout(G, scale=500.0)
 
     for n in doc.getElementsByTagName('node'):
         id = n.getAttribute('id')
         if pos.has_key(id):
-	    for geom in n.getElementsByTagName('y:Geometry'):
-		geom.setAttribute('x', '%s' % pos[id][0])
-		geom.setAttribute('y', '%s' % pos[id][1])
+            for geom in n.getElementsByTagName('y:Geometry'):
+                geom.setAttribute('x', '%s' % pos[id][0])
+                geom.setAttribute('y', '%s' % pos[id][1])
 
 def render(doc, graphml, root, graph, options, subgraph=False):
     if root:
         folder = dot.Folder(graph['name'])
 
-	sub = dot.Graph(folder.id).exportGraphml(doc, graphml, options)
-	sub.setAttribute(u'parse.edges',u'%d' % len(graph['edges']))   
-	sub.setAttribute(u'parse.nodes',u'%d' % len(graph['nodes']))
-	sub.setAttribute(u'parse.order', u'free')    
+        sub = dot.Graph(folder.id).exportGraphml(doc, graphml, options)
+        sub.setAttribute(u'parse.edges',u'%d' % len(graph['edges']))   
+        sub.setAttribute(u'parse.nodes',u'%d' % len(graph['nodes']))
+        sub.setAttribute(u'parse.order', u'free')    
 
         dom = folder.exportGraphml(doc, graphml, options)
-	root.appendChild(dom)
-	dom.appendChild(sub)
+        root.appendChild(dom)
+        dom.appendChild(sub)
 
         root = sub
 
@@ -340,10 +340,10 @@ def render(doc, graphml, root, graph, options, subgraph=False):
         #    nxag = AG.add_subgraph(None, folder.id)
 
     else:
-	root = dot.Graph().exportGraphml(doc, graphml, options)
-	root.setAttribute(u'parse.edges',u'%d' % len(graph['edges']))   
-	root.setAttribute(u'parse.nodes',u'%d' % len(graph['nodes']))
-	root.setAttribute(u'parse.order', u'free')    
+        root = dot.Graph().exportGraphml(doc, graphml, options)
+        root.setAttribute(u'parse.edges',u'%d' % len(graph['edges']))   
+        root.setAttribute(u'parse.nodes',u'%d' % len(graph['nodes']))
+        root.setAttribute(u'parse.order', u'free')    
 
         #nxag = AG
     
@@ -358,12 +358,12 @@ def render(doc, graphml, root, graph, options, subgraph=False):
         graph['dot'].append('rank=%s;' % graph['rank'])
 
     for node in graph['nodes']:
-	# Process node
-	n = dot.Node()
+        # Process node
+        n = dot.Node()
         graph['dot'].append('%s;' % n.id)
         #if graph.has_key('rank'):
         #    rank_same.append(n.id)
-	n.label = node['name']
+        n.label = node['name']
         n.attribs['modelName'] = 'sandwich'
         n.attribs['modelPosition'] = 's'
         if node.has_key('Type') and node['Type'].startswith(u'AWS::'):
@@ -373,22 +373,22 @@ def render(doc, graphml, root, graph, options, subgraph=False):
                 n.attribs['SVGNode'] = SVGNode[node['Type']]
 
         if graph.has_key('style'):
-	    n.attribs['shapeType'] = graph['style']
+            n.attribs['shapeType'] = graph['style']
         for k in node.keys():
-	    if k == 'name':
+            if k == 'name':
                 continue
             if isinstance(node[k], basestring):
                 v = node[k]
             else:
-	        v = '%s' % json.dumps(node[k], indent=4, separators=(',', ': '))
+                v = '%s' % json.dumps(node[k], indent=4, separators=(',', ': '))
             if k == 'Description':
                 k = 'description'
-	    if not dot.Node.data_id.has_key(k):
-		dot.add_keydata({ u'for': u'node',  u'attr.name': k, u'attr.type':u'string' })
-	    n.attribs[k] = v
+            if not dot.Node.data_id.has_key(k):
+                dot.add_keydata({ u'for': u'node',  u'attr.name': k, u'attr.type':u'string' })
+            n.attribs[k] = v
 
-	if graph.has_key('default_node') and graph['default_node']:
-	    n.complementAttributes(graph['default_node'])
+        if graph.has_key('default_node') and graph['default_node']:
+            n.complementAttributes(graph['default_node'])
         n.exportGraphml(doc, root, options)
 
         #nxag.add_node(n.id)
