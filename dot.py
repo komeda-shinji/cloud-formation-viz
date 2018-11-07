@@ -109,7 +109,7 @@ def getColorAttribute(attribs, key, defaultcol, conf):
         to RGB format if required
     """
     if conf.Colors:
-        if attribs.has_key(key):
+        if key in attribs:
             return colorNameToRgb(attribs[key], defaultcol)
     return defaultcol
 
@@ -233,9 +233,9 @@ class GraphML:
 
     for key_data in Data_id:
         if key_data['for'] == 'graphml':
-            if key_data.has_key('attr.name'):
+            if 'attr.name' in key_data:
                 data_id[key_data['attr.name']] = key_data['id']
-            elif key_data.has_key('yfiles.type'):
+            elif 'yfiles.type' in key_data:
                 data_id[key_data['yfiles.type']] = key_data['id']
 
 class Graph:
@@ -248,16 +248,16 @@ class Graph:
 
     for key_data in Data_id:
         if key_data['for'] == 'graph':
-            if key_data.has_key('attr.name'):
+            if 'attr.name' in key_data:
                 data_id[key_data['attr.name']] = key_data['id']
-            elif key_data.has_key('yfiles.type'):
+            elif 'yfiles.type' in key_data:
                 data_id[key_data['yfiles.type']] = key_data['id']
 
-    @ClassProperty
+    @property
     def Nodes(cls):
         return cls.__Graphs
 
-    @ClassProperty
+    @property
     def gid(cls):
         return cls.__gid
 
@@ -267,15 +267,15 @@ class Graph:
 
     @classmethod
     def find(cls, label):
-        if cls.__Graphs.has_key(label):
+        if label in cls.__Graphs:
             return cls.Graphs[label]
         else:
             None
 
     def __init__(self, label=None):
         self.__label = ""
-        self.id = 'g%d' % self.__class__.gid
-        self.__class__.gid += 1
+        self.id = 'g%d' % self.__class__.__gid
+        self.__class__.__gid += 1
         self.attribs = {}
         if label:
             self.label = label
@@ -305,38 +305,44 @@ class Node:
 
     __metaclass__ = PropertyMeta
 
-    __Nodes = {}
-    __nid = 0
+    #__Nodes = {}
+    #__nid = 0
+    Nodes = {}
+    nid = 0
     data_id = {}
 
     for key_data in Data_id:
         if key_data['for'] == 'node':
-            if key_data.has_key('attr.name'):
+            if 'attr.name' in key_data:
                 data_id[key_data['attr.name']] = key_data['id']
-            elif key_data.has_key('yfiles.type'):
+            elif 'yfiles.type' in key_data:
                 data_id[key_data['yfiles.type']] = key_data['id']
 
-    @ClassProperty
-    def Nodes(cls):
-        return cls.__Nodes
+    #@property
+    #def Nodes(cls):
+    #    return cls.__Nodes
 
-    @ClassProperty
-    def nid(cls):
-        return cls.__nid
+    #@property
+    #def nid(cls):
+    #    return cls.__nid
 
-    @nid.setter
-    def nid(cls, val):
-        cls.__nid = val
+    #@nid.setter
+    #def nid(cls, val):
+    #    cls.__nid = val
 
     @classmethod
     def find(cls, label):
-        if cls.__Nodes.has_key(label):
-            return cls.__Nodes[label]
+        #if label in cls.__Nodes:
+        #    return cls.__Nodes[label]
+        if label in cls.Nodes:
+            return cls.Nodes[label]
         else:
             None
 
     def __init__(self, label=None):
         self.__label = ""
+        #self.id = 'n%d' % self.__class__.__nid
+        #self.__class__.__nid += 1
         self.id = 'n%d' % self.__class__.nid
         self.__class__.nid += 1
         self.attribs = {}
@@ -354,7 +360,12 @@ class Node:
         self.__label = label
         if label:
             self.attribs['label'] = label
-            self.__class__.__Nodes[label] = self
+            #self.__class__.__Nodes[label] = self
+            if label not in self.__class__.Nodes:
+                self.__class__.Nodes[label] = self
+            else:
+                print('dup label Node: %s' % label)
+                pass
         return
 
     def initFromString(self, line):
@@ -391,7 +402,7 @@ class Node:
                 atts = atts[:spos]
                 self.attribs = parseAttributes(atts)
         # Process sections
-        if self.attribs.has_key("label"):
+        if "label" in self.attribs:
             tlabel = self.attribs["label"]
             if (tlabel != "" and     
                 tlabel.startswith('{') and
@@ -402,7 +413,7 @@ class Node:
     def getLabel(self, conf, multiline=False):
         """ return the label of the node """
         if conf.NodeLabels:
-            if self.attribs.has_key('label'):
+            if 'label' in self.attribs:
                 if len(self.sections) > 0:
                     if multiline:
                         return '\n'.join(self.sections[0])
@@ -418,7 +429,7 @@ class Node:
     def getLabelWidth(self, conf, multiline=False):
         """ return the maximum width label of the node label"""
         if conf.NodeLabels:
-            if self.attribs.has_key('label'):
+            if 'label' in self.attribs:
                 if len(self.sections) > 0:
                     if multiline:
                         # Find maximum label width
@@ -445,7 +456,7 @@ class Node:
     def complementAttributes(self, node):
         """ from node copy all new attributes, that do not exist in self """
         for a in node.attribs:
-            if not self.attribs.has_key(a):
+            if a not in self.attribs:
                 self.attribs[a] = node.attribs[a]
                 
     def exportDot(self, o, conf):
@@ -482,13 +493,13 @@ class Node:
         if len(self.sections) > 0 and conf.NodeUml and not conf.LumpAttributes:
             exportUml = True
             snode = doc.createElement(u'y:UMLClassNode')
-        elif self.attribs.has_key('ImageNode'):
+        elif 'ImageNode' in self.attribs:
             snode = doc.createElement(u'y:ImageNode')
             simg = doc.createElement(u'y:Image')
             simg.setAttribute(u'alphaImage',u'true')
             simg.setAttribute(u'refid',self.attribs['ImageNode'])
             snode.appendChild(simg)
-        elif self.attribs.has_key('SVGNode'):
+        elif 'SVGNode' in self.attribs:
             snode = doc.createElement(u'y:SVGNode')
             ssvg = doc.createElement(u'y:SVGModel')
             ssvg.setAttribute(u'svgBoundsPolicy',u'0')
@@ -569,15 +580,15 @@ class Node:
 
         data1 = doc.createElement(u'data')
         data1.setAttribute(u'key', Node.data_id['description'])
-        if self.attribs.has_key('description'):
+        if 'description' in self.attribs:
             data1.appendChild(doc.createTextNode(u'%s' % self.attribs['description']))
         data1.setAttribute(u'key', Node.data_id['description'])
-        if self.attribs.has_key('description'):
+        if 'description' in self.attribs:
             data1.appendChild(doc.createTextNode(u'%s' % self.attribs['description']))
         node.appendChild(data1)
         
         for k in Node.data_id.keys():
-            if self.attribs.has_key(k):
+            if k in self.attribs:
                 data1 = doc.createElement(u'data')
                 data1.setAttribute(u'key', Node.data_id[k])
                 data1.appendChild(doc.createTextNode(u'%s' % self.attribs[k]))
@@ -652,33 +663,37 @@ class Edge:
 
     __metaclass__ = PropertyMeta
 
-    __Edges = {}
-    __eid = 0
+    #__Edges = {}
+    #__eid = 0
+    Edges = {}
+    eid = 0
     data_id = {}
 
     for key_data in Data_id:
         if key_data['for'] == 'edge':
-            if key_data.has_key('attr.name'):
+            if 'attr.name' in key_data:
                 data_id[key_data['attr.name']] = key_data['id']
-            elif key_data.has_key('yfiles.type'):
+            elif 'yfiles.type' in key_data:
                 data_id[key_data['yfiles.type']] = key_data['id']
 
-    @ClassProperty
-    def Edges(cls):
-        return cls.__Edges
+    #@property
+    #def Edges(cls):
+    #    return cls.__Edges
 
-    @ClassProperty
-    def eid(cls):
-        return cls.__eid
+    #@property
+    #def eid(cls):
+    #    return cls.__eid
 
-    @eid.setter
-    def eid(cls, val):
-        cls.__eid = val
+    #@eid.setter
+    #def eid(cls, val):
+    #    cls.__eid = val
 
     @classmethod
     def find(cls, label):
-        if cls.__Edges.has_key(label):
-            return cls.__Edges[label]
+        #if label in cls.__Edges:
+        #    return cls.__Edges[label]
+        if label in cls.Edges:
+            return cls.Edges[label]
         else:
             None
 
@@ -741,15 +756,15 @@ class Edge:
     def getLabel(self, nodes, conf):
         """ return the label of the edge """
         if conf.EdgeLabels:
-            if self.attribs.has_key('label'):
+            if 'label' in self.attribs:
                 return self.attribs['label']
             else:
                 if conf.EdgeLabelsAutoComplete:
                     srclink = self.src
                     destlink = self.dest
-                    if (nodes[self.src].attribs.has_key('label')):
+                    if 'label' in (nodes[self.src].attribs):
                         srclink = nodes[self.src].attribs['label']
-                    if (nodes[self.dest].attribs.has_key('label')):
+                    if 'label' in (nodes[self.dest].attribs):
                         destlink = nodes[self.dest].attribs['label']
                     return "%s -> %s" % (srclink, destlink)
                 else:
@@ -760,7 +775,7 @@ class Edge:
     def complementAttributes(self, edge):
         """ from edge copy all new attributes, that do not exist in self """
         for a in edge.attribs:
-            if not self.attribs.has_key(a):
+            if a not in self.attribs:
                 self.attribs[a] = edge.attribs[a]
                 
     def exportDot(self, o, nodes, conf):
@@ -810,9 +825,9 @@ class Edge:
         arrow_tail = conf.DefaultArrowTail
         arrow_head = conf.DefaultArrowHead
         if conf.Arrows:
-            if self.attribs.has_key('arrowtail'):
+            if 'arrowtail' in self.attribs:
                 arrow_tail = self.attribs['arrowtail']
-            if self.attribs.has_key('arrowhead'):
+            if 'arrowhead' in self.attribs:
                 arrow_head = self.attribs['arrowhead']
         arrow.setAttribute(u'source',u'%s' % arrow_tail)                
         arrow.setAttribute(u'target',u'%s' % arrow_head)                
@@ -853,23 +868,23 @@ def add_keydata(key_data):
     id = 'd%d' % (len(Data_id) + 1)
 
     key = None
-    if key_data.has_key('attr.name'):
+    if 'attr.name' in key_data:
         key = key_data['attr.name']
-    elif key_data.has_key('yfiles.type'):
+    elif 'yfiles.type' in key_data:
         key = key_data['yfiles.type']
 
     if key_data['for'] == 'node':
-        if not Node.data_id.has_key(key):
+        if key not in Node.data_id:
             Node.data_id[key] = id
             key_data['id'] = id
             Data_id.append(key_data)
     elif key_data['for'] == 'node':
-        if not Edge.data_id.has_key(key):
+        if key not in Edge.data_id:
             Edge.data_id[key] = id
             key_data['id'] = id
             Data_id.append(key_data)
     elif key_data['for'] == 'graphml':
-        if not GraphML.data.has_key(key):
+        if key not in GraphML.data:
             GraphML.data_id[key] = id
             key_data['id'] = id
             Data_id.append(key_data)
