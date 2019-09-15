@@ -23,7 +23,7 @@ cfgraphml
 ===================
 
 The `cfgraphml` script was created based on cfviz and [dottoxml].
-My fork dottoxml repository can be found [here] [dottoxml_fork].
+My fork dottoxml repository can be found [here][dottoxml_fork].
 
 This tool is for creating visualizations of CloudFormation templates.
 It outputs GraphML file. It can be used like this:
@@ -42,8 +42,8 @@ It requires further either [pydot] and [pygraphviz].
 [networkx]: https://networkx.github.io
 [pydot]: https://pypi.python.org/pypi/pydot
 [pygraphviz]: https://pygraphviz.github.io
-[dottoxml]: https://bitbucket.org/dirkbaechle/dottoxml
-[dottoxml_fork]: https://bitbucket.org/komeda_shinji/dottoxml
+[dottoxml]: https://github.com/dirkbaechle/dottoxml
+[dottoxml_fork]: https://github.com/komeda-shinji/dottoxml
 
 You can edit the output with [yEd], and create a PNG or SVG output to be any use.
 
